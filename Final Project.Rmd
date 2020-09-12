@@ -1,0 +1,236 @@
+---
+title: "Team 7 Project"
+author: Casey Burgin, Taylor Dyer, Grayson Felt, Heber Jenson, Aleisha Grgich, Peyton
+  Knight
+date: "11/21/2019"
+output: pdf_document
+---
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(stargazer)
+library(car)
+library(effects)
+library(corrgram)
+library(wooldridge)
+library(lmtest)
+```
+
+**Introduction**
+We want to investigate the question "How does high school size affect college GPA?" We decided to use the data set GPA2, found in the Wooldridge package. This data set comes from a midsize research university that supports men and women athletics at the Division I level. The original data set has 4,137 observations on 12 variables, including college GPA, combined SAT scores, high school size, and high school rank. There are also several dummy variables, such as athlete, gender, and race. Our main goal is to find out how the size of an individuals high school affects their college GPA; however, we will also investigate some other facets, such as "Does being an athlete affect GPA?" and "Does being male or female have an effect on GPA?" Understanding the effect that certain variables have on college GPA can give us a better understanding of how we can best prepare for college and could help guide changes in high school to create the most productive setting for learning.  
+
+**Data**
+We are using the data set GPA2 from the Wooldridge library. Our dependent variable is *colgpa*, which is the GPA after fall semester.
+Our independent variables will include *sat*, which is the combined SAT score; *tothrs*, which is the total hours through fall semester; *athlete*, a dummy variable to tell if student is an athlete; *hsize*, which is the size of their high school graduating class; *hsrank*, which is the rank in their high school graduating class; *female*, a dummy variable to compare gender; and *black*, a dummy variable to compare race.
+
+```{r,comment=NA}
+df <- gpa2
+df <- df[complete.cases(gpa2),]
+df <- select(df, -c(verbmath,hsizesq ))
+corrgram(df, order=TRUE, lower.panel=panel.shade,upper.panel=panel.pie,
+           text.panel=panel.txt,main="Correlations between variables")
+summary(df)
+br<- lm(colgpa~.,df)
+stargazer(br, type = 'text')
+```
+
+```{r,comment=NA}
+hist(df$colgpa, breaks = 50)
+hist(resid(br), breaks = 50)
+```
+
+**Empirical Framework**
+The basic model we wanted to start with is: 
+$$\widehat{colgpa} =\beta_0+\beta_1sat+\beta_2tothrs+\delta_0athlete+$$
+$$\beta_3hsize+\beta_4hsrank+\beta_5hsperc+\delta_1female+\delta_2white+\delta_3black+u$$
+
+```{r,comment=NA}
+MRM <- lm(colgpa~ .,df)
+stargazer(MRM, type = "text", digits = 5)
+bptest(MRM)
+coeftest(MRM, vcov= hccm(MRM, type="hc0"))
+```
+The estimated basic model, using the robust coefficients, is as follows:
+$$\widehat{colgpa}=1.22675+0.00151sat+0.00174tothrs+0.217athlete$$
+$$+0.00535hsize-0.00129hrank-0.0101hsperc+0.146female-0.0316white-0.331black$$
+
+We used the OLS with robust errors as our estimation technique. This is because we can make the following assumptions:
+
+1) It is linear in parameters.
+2) There are no perfect collinearity issues as seen by our correlation analysis.
+3) We assume the zero conditional mean assumption holds true because we are controlling for enough variables.
+4) Our data is not homoskedastic as shown by the bptest. This requires us to include the robust errors to correct our OLS estimation.
+5) The distribution of the residuals is normally distributed due to the central limit theorem (because we have 4000+ observations).
+6) Our equation also passes the multicollinearity test as shown by the VIF test found above.
+
+The functional form is a level-level model. This made the most logical sense, as we are restricted by our dependent variable from performing a log transformation. We later tested different interactions and quadratic functional forms to create the best overall model for estimating colgpa.
+
+**Results**
+
+We attempted over 20 different estimates containing a variety of interactions and quadratic functions.
+
+$$\widehat{colgpa}~\beta_0+\beta_1sat+\beta_2tothrs+\delta_0athlete$$
+$$+\beta_3hsrank+\beta_4hsperc+\delta_1female+\delta_2black+\delta_3(black*athlete)+u$$
+
+This equation shows a variety of interesting information about gender, race, and high school rankings.
+
+```{r, eval=FALSE}
+A <- lm(colgpa~ I(sat^2)+athlete+I(athlete*black)+hsize+tothrs+
+          female+black+I(hsrank*sat)+white,df)
+B <- lm(colgpa~ hsrank+I(sat^2)+I(athlete*black)+hsize+tothrs+
+          female+black+I(hsrank*sat),df)
+C <- lm(colgpa~ I(sat^2)+I(athlete*black)+hsize+tothrs+
+          female+black+I(hsrank*sat),df)
+D <- lm(colgpa~ I(sat^2)+I(tothrs^2)+I(athlete^2)+I(hsize^2)+
+          I(hsperc^2)+I(female^2)+I(black^2),df)
+E <- lm(colgpa~sat+tothrs+athlete+hsize+hsrank+hsperc+
+          female+black+white,df)
+F <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black,df)
+G <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete),df)
+H <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete),df)
+I <- lm(colgpa~sat+I(tothrs^2)+athlete+hsrank+hsperc+
+          female+black+I(black*athlete),df)
+J <- lm(colgpa~hsize+hsperc+sat+female+athlete,df)
+K <- lm(colgpa~female+sat+hsperc+tothrs,df)
+L <- lm(colgpa~sat+hsperc+tothrs+female+black+white,df)
+M <- lm(colgpa~sat+hsize+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsize^2)+white,df)
+N <- lm(colgpa~sat+hsize+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsize^2),df)
+O <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsize^2),df)
+P <- lm(colgpa~sat+I(hsize*black)+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsize^2),df)
+Q <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete),df)
+R <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(black*sat),df)
+S <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(female*athlete),df)
+T <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(athlete*tothrs),df)
+U <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsrank*hsperc)+I(hsize*hsrank),df)
+V <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsrank*hsperc),df)
+W <- lm(colgpa~log(sat)+log(tothrs)+athlete+log(hsrank)+log(hsperc)+
+          female+black+I(black*athlete),df)
+X <- lm(colgpa~log(sat)+log(tothrs)+log(hsrank)+log(hsperc)+
+          female+black+I(black*athlete),df)
+
+stargazer(A,B,C, type = "text", digits = 4)
+stargazer(D,E,F, type = "text", digits = 4)
+stargazer(G,H,I, type = "text", digits = 4)
+stargazer(J,K,L, type = "text", digits = 4)
+stargazer(M,N,O, type = "text", digits = 4)
+stargazer(P,Q,R, type = "text", digits = 4)
+stargazer(S,T,U, type = "text", digits = 4)
+stargazer(V,W,X, type = "text", digits = 4)
+```
+
+```{r, comment=NA}
+N <- lm(colgpa~sat+hsize+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsize^2),df)
+plot(effect("hsize",N))
+```
+This shows that $hsize^2$ should not be used in the model, as two stories are being told with lots of data points on each side of the minimum value.
+
+```{r,comment=NA}
+U <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+
+          female+black+I(black*athlete)+I(hsrank*hsperc)+I(hsize*hsrank),df)
+stargazer(U,type = "text", digits = 5)
+bptest(U)
+coeftest(U, vcov= hccm(U, type="hc0"))
+vif(U)
+```
+This model suffers from multicollinearity. Let's consider V:
+```{r,comment=NA}
+V <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+female+black+I(black*athlete)+I(hsrank*hsperc),df)
+stargazer(V,type = "text", digits = 5)
+bptest(V)
+coeftest(V, vcov= hccm(V, type="hc0"))
+vif(V)
+```
+Although this model doesn't have a VIF score above 10, the interaction between hsrank and hsperc should probably be removed. Now lets look at Q:
+
+```{r,comment=NA}
+Q <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+female+black+I(black*athlete),df)
+stargazer(Q,type = "text", digits = 5)
+bptest(Q)
+coeftest(Q, vcov= hccm(Q, type="hc0"))
+vif(Q)
+```
+Everything seems to check out. The BP test does show that there is heteroskedasticity in the data, which means we will need to report the robust estimates. Overall, this model seems to fit our data best. Now let's test our dummy variables to make sure they matter.
+
+```{r}
+Q <- lm(colgpa~sat+tothrs+athlete+hsrank+hsperc+female+black+I(black*athlete),df)
+linearHypothesis(Q, c("black=0","I(black * athlete)"), vcov=hccm(Q,type="hc0"))
+linearHypothesis(Q, c("athlete","I(black * athlete)"), vcov=hccm(Q,type = "hc0"))
+linearHypothesis(Q, "female=0",vcov=hccm(Q,type = "hc0"))
+```
+Dummy variables do matter in the equation. We will now construct the LPM.
+
+```{r,comment=NA}
+df <- mutate(df, AAGPA=ifelse(colgpa>mean(colgpa),1,0))
+lpm <- lm(AAGPA~sat+tothrs+athlete+hsrank+hsperc+female+black+I(black*athlete),df)
+stargazer(lpm,type = "text", digits = 5)
+bptest(lpm)
+```
+
+WLS
+```{r,comment=NA}
+y_hat <- predict(lpm)
+summary(y_hat)  
+h     <- y_hat * (1-y_hat)
+range(h) 
+
+h<- ifelse(h<0,0.01,h)
+summary(h)
+
+w<- 1/h
+wls <- lpm <- lm(AAGPA~sat+tothrs+athlete+hsrank+hsperc+female+black+I(black*athlete),df)
+stargazer(lpm, wls, type = "text")
+
+ywls <- predict(wls)
+summary(ywls)
+
+CM <- table(df[, "AAGPA"], predict(wls) >= 0.4)
+prop.table(CM,1)
+(PC_PO <- (sum(ywls >= 0.4 & df$AAGPA==1) + sum(ywls <= 0.4 & df$AAGPA==0)) / length(df$AAGPA))
+
+```
+
+```{r,comment=NA}
+stargazer(Q,type = "text", digits = 5)
+bptest(Q)
+coeftest(Q, vcov= hccm(Q, type="hc0"))
+vif(Q)
+```
+The final equation we found to estimate colgpa is:
+
+$$\widehat{colgpa}=1.209+0.00152sat+0.00172tothrs+0.13778athlete$$
+$$-0.00117hsrank-0.01065hsperc+0.14705female-0.37265black+0.42981black*athlete$$
+
+*You will see the Robust Standard errors in the report above.*
+
+The coefficient's interpretations are as follows, assuming that all other variables are held constant:
+This means that for every unit increase in sat score, colgpa is anticipated to increase by 0.00152 units.
+For every unit increase to tothrs, colgpa will increase by 0.00172 units.
+Athletes, on average, are estimated to have a colgpa of .13778 higher than non-athletes.
+For every unit increase in hsrank, colgpa will decrease by 0.00117 units. (Remember definition of hsrank)
+For every unit increase in hsperc, colgpa will decrease by 0.01065 units.  (Remember definition of hsperc)
+Females, on average, are estimated to have a colgpa of 0.14705 higher than males.
+Being black shows an estimate of having a colgpa of .37265 lower than non-blacks.
+Being a black athlete predicts a colpga of .42981 units lower than non-black, non-athletes.
+
+The R-squared for the estimate says that, according to our data, the variables explain about 31.79% of colgpa. Adjusted R-squared is the better explanation for colgpa, as it factors in the significance of the variables used to estimate colgpa. In our model, we calculated an adjusted R-squared value of 0.31661, or 31.66%. The F-stat measures the overall significance of the variables being used to predict colgpa. The T-stats are similar to the F-stat, except each T-stat only measure one variable's significance.
+
+**Conclusion**
+
+From our analysis of the data, we conclude that hsize does not have a significant impact on estimating colgpa. This was surprising to us, as we believed that a smaller hsize would lead to a higher colgpa. Instead, we found that race and gender have the largest impact on estimating colgpa. Any data that related to high school was not practical as a significant variable to change the overall colgpa. From our data, we see that for all black students, even across gender, colgpa is lower, only excluding black male athletes.
+
+For further investigation, we would hope to obtain more information from students to better estimate colgpa. Variables we would like to see included in a dataset would be scholarships each student has, marriage status, working hours per week, hours of sleep per week, high school gpa, and socioeconomic status. We feel like these variables would lead to a more accurate estimation of colgpa.
